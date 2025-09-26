@@ -72,25 +72,56 @@ class FinanciamentoImobiliario:
         meses_restantes_original = self.prazo_meses - (mes_amortizacao - 1); i_invest = taxa_rendimento_mensal_investimento / 100
         valor_final_investimento = valor_amortizacao * (1 + i_invest)**meses_restantes_original; lucro_investimento = valor_final_investimento - valor_amortizacao
         return {"economia_juros": economia_de_juros, "lucro_investimento": lucro_investimento}
+    
     @staticmethod
     def simular_compra_na_planta(valor_imovel_inicial, prazo_obra_meses, taxa_incc_mensal, pagamentos_construtora):
-        i_incc = taxa_incc_mensal / 100; total_pago_corrigido, total_pago_nominal = 0, 0; cronograma = [0] * (prazo_obra_meses + 1)
+        i_incc = taxa_incc_mensal / 100
+        total_pago_corrigido, total_pago_nominal = 0, 0
+        cronograma = [0] * (prazo_obra_meses + 1)
+        total_pos_chaves_nominal = 0
+
         for pg in pagamentos_construtora:
             if pg['valor'] > 0:
-                total_pago_nominal += pg['valor'] * (pg.get('qtd', 1))
-                if pg['tipo'] == 'ato': cronograma[0] += pg['valor']
+                # Acumula o valor nominal total para referência
+                total_pago_nominal += pg['valor'] * pg.get('qtd', 1)
+                
+                # Processa pagamentos que ocorrem ANTES ou ATÉ a entrega das chaves
+                if pg['tipo'] == 'ato':
+                    cronograma[0] += pg['valor']
                 elif pg['tipo'] == 'mensal':
-                    for i in range(1, pg['qtd'] + 1):
-                        if i <= prazo_obra_meses: cronograma[i] += pg['valor']
+                    for i in range(1, pg.get('qtd', 1) + 1):
+                        if i <= prazo_obra_meses:
+                            cronograma[i] += pg['valor']
                 elif pg['tipo'] == 'anual':
-                    for mes in pg['meses']:
-                        if mes <= prazo_obra_meses: cronograma[mes] += pg['valor']
+                    for mes in pg.get('meses', []):
+                        if mes <= prazo_obra_meses:
+                            cronograma[mes] += pg['valor']
+                # *** NOVO: Processa pagamentos PÓS-CHAVES ***
+                elif pg['tipo'] == 'pos_chaves':
+                    # Estes valores são nominais e não entram no cálculo de correção do INCC
+                    total_pos_chaves_nominal += pg['valor'] * pg.get('qtd', 1)
+
+        # Calcula o valor corrigido dos pagamentos feitos DURANTE a obra
         for mes in range(prazo_obra_meses + 1):
             pagamento_nominal = cronograma[mes]
-            if pagamento_nominal > 0: total_pago_corrigido += pagamento_nominal * (1 + i_incc)**mes
+            if pagamento_nominal > 0:
+                total_pago_corrigido += pagamento_nominal * (1 + i_incc)**mes
+        
+        # O valor final do imóvel é corrigido pelo INCC até a entrega das chaves
         valor_imovel_final = valor_imovel_inicial * (1 + i_incc)**prazo_obra_meses
-        saldo_a_financiar = valor_imovel_final - total_pago_corrigido
-        return {"valor_imovel_final": valor_imovel_final, "total_pago_corrigido": total_pago_corrigido, "saldo_a_financiar": saldo_a_financiar, "total_pago_nominal": total_pago_nominal}
+        
+        # O total da entrada é a soma dos valores corrigidos (durante a obra) + os valores nominais (pós-obra)
+        total_entrada_final = total_pago_corrigido + total_pos_chaves_nominal
+        
+        # O saldo a financiar é a diferença entre o valor final do imóvel e tudo que foi pago para a construtora
+        saldo_a_financiar = valor_imovel_final - total_entrada_final
+        
+        return {
+            "valor_imovel_final": valor_imovel_final, 
+            "total_pago_corrigido": total_entrada_final, # Renomeado para refletir o total da entrada
+            "saldo_a_financiar": saldo_a_financiar, 
+            "total_pago_nominal": total_pago_nominal
+        }
 
 def analisar_comprar_vs_alugar(params):
     financiamento = FinanciamentoImobiliario(params['valor_imovel'], params['valor_entrada'], params['taxa_juros_anual'], params['prazo_anos'])
@@ -217,13 +248,27 @@ with st.sidebar:
         valor_imovel_planta = st.number_input("Valor do Imóvel (na planta) (R$)", value=600000, step=10000, help="O preço inicial do imóvel no momento do lançamento pela construtora.")
         prazo_obra = st.slider("Prazo da Obra (meses)", 12, 60, 36, help="Tempo estimado em meses que a construtora levará para entregar as chaves.")
         incc_mensal = st.slider("Taxa INCC Mensal (%)", 0.0, 2.0, 0.5, 0.05, help="Estimativa da correção mensal do seu saldo devedor com a construtora. Historicamente, o INCC varia entre 0.4% e 1% ao mês.")
+        
         with st.expander("Detalhar Pagamento da Entrada na Planta"):
             ato = st.number_input("Valor do Ato (R$)", value=30000, help="Pagamento inicial feito na assinatura do contrato com a construtora.")
-            mensais_qtd = st.number_input("Qtd. Parcelas Mensais", value=36, help="Número de parcelas pagas mensalmente durante a obra.")
+            st.markdown("---")
+            mensais_qtd = st.number_input("Qtd. Parcelas Mensais (durante obra)", value=36, help="Número de parcelas pagas mensalmente durante a obra.")
             mensais_valor = st.number_input("Valor da Parcela Mensal (R$)", value=2500, help="Valor nominal de cada parcela mensal.")
-            anuais_qtd = st.number_input("Qtd. Balões Anuais", value=2, help="Número de parcelas intermediárias, maiores, geralmente pagas uma vez por ano.")
+            st.markdown("---")
+            anuais_qtd = st.number_input("Qtd. Balões Anuais (durante obra)", value=2, help="Número de parcelas intermediárias, maiores, geralmente pagas uma vez por ano.")
             anuais_valor = st.number_input("Valor do Balão Anual (R$)", value=15000, help="Valor nominal de cada balão/parcela anual.")
-        pagamentos_planta = [{'tipo': 'ato', 'valor': ato}, {'tipo': 'mensal', 'valor': mensais_valor, 'qtd': mensais_qtd}, {'tipo': 'anual', 'valor': anuais_valor, 'meses': [12 * i for i in range(1, anuais_qtd + 1)]}]
+            st.markdown("---")
+            # --- NOVOS CAMPOS ADICIONADOS ---
+            pos_chaves_qtd = st.number_input("Qtd. Parcelas Pós-Chaves", value=24, help="Número de parcelas pagas diretamente à construtora APÓS a entrega das chaves.")
+            pos_chaves_valor = st.number_input("Valor da Parcela Pós-Chaves (R$)", value=1000, help="Valor nominal de cada parcela pós-chaves. Este valor não sofre correção do INCC.")
+        
+        # --- LÓGICA DE CÁLCULO ATUALIZADA ---
+        pagamentos_planta = [
+            {'tipo': 'ato', 'valor': ato}, 
+            {'tipo': 'mensal', 'valor': mensais_valor, 'qtd': mensais_qtd}, 
+            {'tipo': 'anual', 'valor': anuais_valor, 'meses': [12 * i for i in range(1, anuais_qtd + 1)]},
+            {'tipo': 'pos_chaves', 'valor': pos_chaves_valor, 'qtd': pos_chaves_qtd} # Nova entrada
+        ]
         resultado_planta = FinanciamentoImobiliario.simular_compra_na_planta(valor_imovel_planta, prazo_obra, incc_mensal, pagamentos_planta)
         valor_imovel = resultado_planta['valor_imovel_final']
         valor_entrada = resultado_planta['total_pago_corrigido']
@@ -261,7 +306,7 @@ with tab1:
         with st.container(border=True):
             st.subheader("Simulação de Imóvel na Planta Concluída")
             col1, col2, col3 = st.columns(3)
-            col1.metric("Valor Nominal da Entrada", f"R$ {resultado_planta['total_pago_nominal']:,.2f}")
+            col1.metric("Valor Total da Entrada (Pago à Construtora)", f"R$ {resultado_planta['total_pago_corrigido']:,.2f}")
             col2.metric("Valor Final do Imóvel (Corrigido)", f"R$ {valor_imovel:,.2f}")
             col3.metric("Saldo a Financiar", f"R$ {fin_fixo.valor_financiado:,.2f}")
     col1, col2 = st.columns(2)
