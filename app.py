@@ -300,11 +300,11 @@ if st.sidebar.button("Gerar Relatório Completo em PDF"):
         fig_fin_pdf, axs = plt.subplots(1, 2, figsize=(11, 4))
         if not fin_fixo.tabela_price.empty:
             axs[0].plot(fin_fixo.tabela_sac['Mês'].to_numpy(), fin_fixo.tabela_sac['Saldo Devedor'].to_numpy(), label='SAC', color='#ff4b4b'); axs[0].plot(fin_fixo.tabela_price['Mês'].to_numpy(), fin_fixo.tabela_price['Saldo Devedor'].to_numpy(), label='Price', color='#0e1117'); axs[0].set_title('Saldo Devedor'); axs[0].legend(); axs[0].grid(True, alpha=0.5)
-            axs[1].plot(fin_fixo.tabela_sac['Mês'].to_numpy(), fin_fixo.tabela_sac['Juros'].cumsum().to_numpy(), label='SAC', color='#ff4b4b'); axs[1].plot(fin_fixo.tabela_price['Mês'].to_numpy(), fin_fixo.tabela_price['Juros'].cumsum().to_numpy(), label='Price', color='#0e1117'); axs[1].set_title('Juros Acumulados'); axs[1].legend(); axs[1].grid(True, alpha=0.5); plt.tight_layout()
+            axs[1].plot(fin_fixo.tabela_sac['Mês'].to_numpy(), fin_fixo.tabela_sac['Juros'].cumsum().to_numpy(), label='SAC', color='#ff4b4b'); axs[1].plot(fin_fixo.tabela_price['Mês'].to_numpy(), fin_fixo.tabela_price['Juros'].cumsum().to_numpy(), label='Price', color='#0e1117'); axs[1].set_title('Juros Acumulados'); axs[1].legend(); axs[1].grid(True, alpha=0.5)
         
         fig_cva_pdf, ax = plt.subplots(figsize=(11, 5))
         if not df_cva.empty:
-            ax.plot(df_cva['Ano'].to_numpy(), df_cva['Patrimônio (Comprando)'].to_numpy(), label='Comprando', marker='o'); ax.plot(df_cva['Ano'].to_numpy(), df_cva['Patrimônio (Alugando)'].to_numpy(), label='Alugando', marker='o'); ax.set_title('Evolução do Patrimônio Líquido'); ax.legend(); ax.grid(True, alpha=0.5); plt.tight_layout()
+            ax.plot(df_cva['Ano'].to_numpy(), df_cva['Patrimônio (Comprando)'].to_numpy(), label='Comprando', marker='o'); ax.plot(df_cva['Ano'].to_numpy(), df_cva['Patrimônio (Alugando)'].to_numpy(), label='Alugando', marker='o'); ax.set_title('Evolução do Patrimônio Líquido'); ax.legend(); ax.grid(True, alpha=0.5)
         
         pdf_bytes = gerar_pdf_completo(st.session_state, fin_fixo, fig_fin_pdf, df_cva, fig_cva_pdf)
         st.sidebar.download_button(label="Baixar Relatório PDF", data=pdf_bytes, file_name=f"relatorio_imobiliário_{datetime.now().strftime('%Y%m%d')}.pdf", mime="application/pdf")
