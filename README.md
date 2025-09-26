@@ -107,6 +107,12 @@ Contribuições são bem-vindas! Se você tem ideias para novas funcionalidades 
 4.  Fazer o **Push** para a Branch (`git push origin feature/sua-feature`).
 5.  Abrir um **Pull Request**.
 
+## 📝 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+
+---
+
 
 **Desenvolvido por Robson Ricardo da Silva**
 
